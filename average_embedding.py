@@ -1,6 +1,7 @@
 from nltk.corpus import brown, stopwords
 from nltk.tokenize import word_tokenize
 import multiprocessing
+from sklearn.feature_extraction.text import TfidfVectorizer
 import os
 from sklearn.datasets import fetch_20newsgroups
 from gensim.models import Word2Vec
@@ -12,6 +13,9 @@ from keras.layers import Embedding, Flatten, Dense
 from keras.initializers import Constant
 from keras.utils import np_utils
 from keras import backend as K
+from keras.wrappers.scikit_learn import KerasClassifier
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
 
 
 import numpy as np
@@ -126,20 +130,30 @@ def f1_m(y_true, y_pred):
     recall = recall_m(y_true, y_pred)
     return 2*((precision*recall)/(precision+recall+K.epsilon()))
 
+def get_tfidf(dataset):
+    data =[' '.join(doc) for doc in dataset]
+    ngram_size = 1
+    tfidf_vect = TfidfVectorizer(ngram_range=(ngram_size, ngram_size), stop_words='english')
+    tfidf_value = tfidf_vect.fit_transform(data).toarray()
+    return tfidf_value
+
+#tfidf = get_tfidf(docs)
+
 
 
 #define model
-def get_model(number_feature):
+def get_model():
     model = Sequential()
     # embedding_layer = Embedding(num_words,300, embeddings_initializer=Constant(embedding_matrix), input_length=max_length,trainable=False)
     #model.add(embedding_layer)
-    model.add(Dense(100, input_dim=number_feature, activation='relu'))
+    model.add(Dense(100, input_dim=max_length, activation='relu'))
     model.add(Dense(4,activation='softmax'))
-    model.compile(loss="categorical_crossentropy", optimizer='adam', metrics=['accuracy',f1_m,precision_m, recall_m])
+    model.compile(loss="categorical_crossentropy", optimizer='adam', metrics=['accuracy'])
     model.summary()
     return model
+''''
+model = get_model()
 
-model = get_model(max_length)
 train_x = np.array(word_emb_weight[:2000])
 test_x = np.array(word_emb_weight[2001:])
 train_y = Y[:2000]
@@ -149,13 +163,24 @@ encoded_test_y = np_utils.to_categorical(test_y)
 
 model.fit(train_x,encoded_train_y,epochs=150, batch_size=10)
 loss,accuracy,f1,pre,rec =model.evaluate(test_x,encoded_test_y)
+'''
+#-------------k fold cross validation----------------------------------------------
+data_X = np.array(word_emb_weight)
+estimator = KerasClassifier(build_fn=get_model, epochs=200, batch_size=10, verbose=1)
+kfold = KFold(n_splits=10, shuffle=True)
+results = cross_val_score(estimator, data_X, Y, cv=kfold)
+print("Baseline: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
 
+
+
+
+'''''
 print("Loss :",loss)
 print("Accuracy : ",accuracy)
 print("F1-measure: ",f1)
 print("Precision: ",pre)
 print("Recall: ",rec)
-
+'''
 
 
 #sentences = brown.sents()
